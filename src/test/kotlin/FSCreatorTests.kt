@@ -1,7 +1,4 @@
-import org.example.FSCreator
-import org.example.FSException
-import org.example.FSFile
-import org.example.FSFolder
+import org.example.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
@@ -170,6 +167,69 @@ class FSCreatorTests {
         Assertions.assertEquals(expectedMessage, exception.message)
     }
 
+    @Test
+    fun testExceptionSimpleLoopInStructure() {
+        val content = mutableListOf<FSEntry>()
+        val folder = FSFolder("test", content)
+        content.add(folder)
+        val exception = Assertions.assertThrows(FSException::class.java) {
+            FSCreator.create(folder, tempDir.toString())
+        }
+        val expectedMessage = "File structure contains a loop"
+        Assertions.assertEquals(expectedMessage, exception.message)
+    }
 
+    @Test
+    fun testUsingTheSameFilesInDifferentFoldersWithoutLoopsNotThrowingException() {
+        val file = FSFile("testFile.txt", "File content")
+        val folder = FSFolder("folder", listOf(file))
+        val rootFolder = FSFolder("root", listOf(file, folder))
+        FSCreator.create(rootFolder, tempDir.toString())
 
+        val rootFolderPath = tempDir!!.resolve(rootFolder.name)
+        Assertions.assertTrue(Files.exists(rootFolderPath))
+        Assertions.assertTrue(Files.exists(rootFolderPath.resolve(file.name)))
+
+        val folderPath = rootFolderPath.resolve(folder.name)
+        Assertions.assertTrue(Files.exists(folderPath))
+        Assertions.assertTrue(Files.exists(folderPath.resolve(file.name)))
+    }
+
+    @Test
+    fun testUsingTheSameFoldersInDifferentFoldersWithoutLoopsNotThrowingException() {
+        val folder1 = FSFolder("folder1", emptyList())
+        val folder2 = FSFolder("folder2", listOf(folder1))
+        val rootFolder = FSFolder("root", listOf(folder1, folder2))
+        FSCreator.create(rootFolder, tempDir.toString())
+
+        val rootFolderPath = tempDir!!.resolve(rootFolder.name)
+        Assertions.assertTrue(Files.exists(rootFolderPath))
+        Assertions.assertTrue(Files.exists(rootFolderPath.resolve(folder1.name)))
+
+        val folderPath = rootFolderPath.resolve(folder2.name)
+        Assertions.assertTrue(Files.exists(folderPath))
+        Assertions.assertTrue(Files.exists(folderPath.resolve(folder1.name)))
+    }
+
+    @Test
+    fun testExceptionComplicatedLoopStructure() {
+        val file = FSFile("file", "File content")
+        val content1 = mutableListOf<FSEntry>()
+        val content2 = mutableListOf<FSEntry>()
+        val content3 = mutableListOf<FSEntry>()
+        val folder1 = FSFolder("folder1", content1)
+        val folder2 = FSFolder("folder2", content2)
+        val folder3 = FSFolder("folder3", content3)
+        val rootFolder = FSFolder("root", listOf(folder1, folder2))
+        content1.add(file)
+        content1.add(folder3)
+        content2.add(folder1)
+        content3.add(folder2)
+
+        val exception = Assertions.assertThrows(FSException::class.java) {
+            FSCreator.create(rootFolder, tempDir.toString())
+        }
+        val expectedMessage = "File structure contains a loop"
+        Assertions.assertEquals(expectedMessage, exception.message)
+    }
 }
